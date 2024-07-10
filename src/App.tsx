@@ -16,7 +16,11 @@ import {
 } from "./App.util"
 
 function App() {
+  // load constants
+  const REST_API_URL: string = import.meta.env.VITE_REST_API_URL
   const typingIndicatorContent = Sender.AI + " is typing..."
+
+  // initialize state
   const [typing, setTyping] = useState<boolean>(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -26,6 +30,7 @@ function App() {
     },
   ])
 
+  // declare helper functions
   const handleSendMessage = async (messageContent: string): Promise<void> => {
     const newUserChatMessage: ChatMessage = {
       message: messageContent,
@@ -47,7 +52,7 @@ function App() {
     const apiMessages = convertChatMessagesToApiMessages(chatMessages)
 
     try {
-      const response = await fetch("http://localhost:3000/api/v1/pizza/order", {
+      const response = await fetch(REST_API_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
