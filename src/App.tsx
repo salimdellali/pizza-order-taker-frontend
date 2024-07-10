@@ -1,7 +1,4 @@
 import { useState } from "react"
-import reactLogo from "./assets/react.svg"
-import viteLogo from "/vite.svg"
-// import "./App.css"
 import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css"
 import {
   MainContainer,
@@ -11,94 +8,117 @@ import {
   MessageInput,
   TypingIndicator,
 } from "@chatscope/chat-ui-kit-react"
+import {
+  Direction,
+  Sender,
+  ChatMessage,
+  convertChatMessagesToApiMessages,
+} from "./App.util"
 
 function App() {
-  const [typing, setTyping] = useState(false)
-  const [messages, setMessages] = useState([
+  const typingIndicatorContent = Sender.AI + " is typing..."
+  const [typing, setTyping] = useState<boolean>(false)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       message: `Hi there! Welcome to our pizza restaurant. What can I get started for you today?\nWe have a variety of pizzas, sides, toppings, and drinks. Let me know what you'd like, and I'll help you with all the details.`,
-      sender: "Pizza AI",
-      direction: "incoming",
+      sender: Sender.AI,
+      direction: Direction.INCOMING,
     },
   ])
 
-  const handleSend = async (message: string) => {
-    const newMessage = {
-      message,
-      sender: "user",
-      direction: "outgoing",
+  const handleSendMessage = async (messageContent: string): Promise<void> => {
+    const newUserChatMessage: ChatMessage = {
+      message: messageContent,
+      sender: Sender.USER,
+      direction: Direction.OUTGOING,
     }
 
-    const newMessages = [...messages, newMessage] // all the old messages + the new one
-
-    // update our messages state
-    setMessages(newMessages)
-
-    // set typing indicator (chatgpt is typing)
+    setChatMessages((prevChatMessages) => [
+      ...prevChatMessages,
+      newUserChatMessage,
+    ])
     setTyping(true)
-
-    // process messages to the backend (send it over and see the response)
-    await processMessagesToBackend(newMessages)
+    await processChatMessagesToBackend([...chatMessages, newUserChatMessage])
   }
 
-  const processMessagesToBackend = async (chatMessages) => {
-    const messages = chatMessages.map((messageObject) => {
-      const role = messageObject.sender === "Pizza AI" ? "assistant" : "user"
-      return { role, content: messageObject.message }
-    })
+  const processChatMessagesToBackend = async (
+    chatMessages: ChatMessage[],
+  ): Promise<void> => {
+    const apiMessages = convertChatMessagesToApiMessages(chatMessages)
 
     try {
-      const data = await fetch("http://localhost:3000/api/v1/pizza/order", {
+      const response = await fetch("http://localhost:3000/api/v1/pizza/order", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages,
+          messages: apiMessages,
         }),
       })
 
-      const jsonData = await data.json()
-      setMessages([
-        ...chatMessages,
-        {
-          message: jsonData.content,
-          sender: "Pizza AI",
-          direction: "incoming",
-        },
-      ])
+      if (!response.ok) {
+        console.error("Received response, but is either 4xx or 5xx")
+        handleSendMessageUnsuccessfulResponse()
+        return
+      }
+      const { content } = await response.json()
 
-      setTyping(false)
-      // console.log(jsonData)
+      const newAssistantChatMessage: ChatMessage = {
+        message: content,
+        sender: Sender.AI,
+        direction: Direction.INCOMING,
+      }
+
+      setChatMessages((prevChatMessages) => [
+        ...prevChatMessages,
+        newAssistantChatMessage,
+      ])
     } catch (error) {
       console.error(error)
+      handleSendMessageUnsuccessfulResponse()
+    } finally {
+      setTyping(false)
     }
+  }
+
+  const handleSendMessageUnsuccessfulResponse = (): void => {
+    const newAssistantErrorChatMessage: ChatMessage = {
+      message: "Something went wrong with my intelligence. Please try again.",
+      sender: Sender.AI,
+      direction: Direction.INCOMING,
+    }
+    setChatMessages((prevChatMessages) => [
+      ...prevChatMessages,
+      newAssistantErrorChatMessage,
+    ])
   }
 
   return (
     <div
       style={{
         position: "relative",
-        height: "95vh",
-        width: "50vw",
+        height: "98vh",
+        width: "95vw",
         margin: "0 auto",
       }}
     >
       <MainContainer>
         <ChatContainer>
           <MessageList
-            // scrollBehavior="smooth"
             typingIndicator={
-              typing ? <TypingIndicator content="Pizza AI is typing" /> : null
+              typing ? (
+                <TypingIndicator content={typingIndicatorContent} />
+              ) : null
             }
           >
-            {messages.map((message, index) => (
-              <Message key={index} model={message} />
+            {chatMessages.map((chatMessage, index) => (
+              <Message key={index} model={chatMessage} />
             ))}
           </MessageList>
           <MessageInput
             placeholder="Type message here"
-            onSend={handleSend}
+            onSend={handleSendMessage}
             attachButton={false}
           />
         </ChatContainer>
