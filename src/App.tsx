@@ -16,9 +16,7 @@ function App() {
   const [typing, setTyping] = useState(false)
   const [messages, setMessages] = useState([
     {
-      message: `Hi there! Welcome to our pizza restaurant. What can I get started for you today?
-          We have a variety of pizzas, sides, toppings, and drinks. Let me know what you'd like, and I'll help you with all the details.
-        `,
+      message: `Hi there! Welcome to our pizza restaurant. What can I get started for you today?\nWe have a variety of pizzas, sides, toppings, and drinks. Let me know what you'd like, and I'll help you with all the details.`,
       sender: "Pizza AI",
       direction: "incoming",
     },
@@ -40,6 +38,41 @@ function App() {
     setTyping(true)
 
     // process messages to the backend (send it over and see the response)
+    await processMessagesToBackend(newMessages)
+  }
+
+  const processMessagesToBackend = async (chatMessages) => {
+    const messages = chatMessages.map((messageObject) => {
+      const role = messageObject.sender === "Pizza AI" ? "assistant" : "user"
+      return { role, content: messageObject.message }
+    })
+
+    try {
+      const data = await fetch("http://localhost:3000/api/v1/pizza/order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages,
+        }),
+      })
+
+      const jsonData = await data.json()
+      setMessages([
+        ...chatMessages,
+        {
+          message: jsonData.content,
+          sender: "Pizza AI",
+          direction: "incoming",
+        },
+      ])
+
+      setTyping(false)
+      // console.log(jsonData)
+    } catch (error) {
+      console.error(error)
+    }
   }
 
   return (
@@ -54,6 +87,7 @@ function App() {
       <MainContainer>
         <ChatContainer>
           <MessageList
+            // scrollBehavior="smooth"
             typingIndicator={
               typing ? <TypingIndicator content="Pizza AI is typing" /> : null
             }
