@@ -105,7 +105,6 @@ function App() {
         position: "relative",
         height: "98vh",
         width: "95vw",
-        margin: "0 auto",
       }}
     >
       <MainContainer>
